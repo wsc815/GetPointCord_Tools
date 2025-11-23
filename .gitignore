@@ -1,0 +1,78 @@
+# ---------------------------
+# Python
+# ---------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+
+# Virtual environment
+.env/
+.venv/
+env/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# PyTorch / Machine Learning artifacts
+*.pth
+*.pt
+*.ckpt
+runs/
+logs/
+tensorboard/
+wandb/
+
+# Temporary files
+*.bak
+*.tmp
+*.log
+
+# Datasets or large data
+data/
+datasets/
+*.npy
+*.npz
+*.csv
+*.h5
+*.zip
+*.tar
+*.tar.gz
+
+# Cache
+.cache/
+*.cache/
+.cache_dir/
+
+# ---------------------------
+# IDE / Editor
+# ---------------------------
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+out/
+
+# VSCode
+.vscode/
+
+# ---------------------------
+# OS Generated files
+# ---------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------
+# Project-specific
+# ---------------------------
+# If your project generates intermediate images or masks
+outputs/
+results/
+checkpoints/
+datasets/
