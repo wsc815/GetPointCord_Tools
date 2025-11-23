@@ -250,4 +250,18 @@ python GetPointCord.py ./annotations/img01.json
 ```
 
 ---
+### V1.0
+在 x-anylabeling 里，用 点标注 标出目标，label 名字必须是：target_point
+
+导出 每张图一个 JSON 的标注文件（x-anylabeling 默认的那种）。
+
+用 Batch_GetPointCord.py 批量把 JSON 里的 target_point 提取成 xxx.txt 点坐标文件。
+
+把图片和对应 txt 放到 dataset_root/train、dataset_root/test 下。
+
+用 Getlist.py 按 P2PNet 要求的结构重组文件夹，并生成 train.list / test.list。
+
+在 P2PNet 里把 --data_root 指到 dataset_root，就能直接训练。
+
+### V1.1
 
