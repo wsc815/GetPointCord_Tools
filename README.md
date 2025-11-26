@@ -1,267 +1,272 @@
-# P2PNet数据集处理工具
 
-> 更新日期：2025/11/21-14:43-sc-wang
+# GetPointCord
 
-本工具包含三个 Python 脚本，用于批量处理 JSON 标注文件、提取目标坐标、组织数据集并生成训练/测试列表文件。
+**用于批量提取 JSON 标注文件中的 point 坐标，并自动组织为 P2PNet 格式数据集的实用工具集**
 
----
+本仓库包含三个脚本，分别用于：
 
-## 📋 目录
+1. **GetPointCord.py**
 
-- [文件说明](#文件说明)
-- [依赖要求](#依赖要求)
-- [使用流程](#使用流程)
-- [详细使用方法](#详细使用方法)
-- [示例数据集结构](#示例数据集结构)
-- [注意事项](#注意事项)
+   * 解析单个 JSON 标注文件
+   * 提取 `shape_type="point"` 的标注
+   * 输出为 `P2PNet` 所需的单独 `.txt` 文件
 
----
+2. **Batch_GetPointCord.py**
 
-## 📁 文件说明
+   * 批量读取文件夹下所有 JSON
+   * 自动批量生成所有 `.txt`（与 JSON 同名）
+   * 支持按标签过滤（可选）
 
-| 文件名 | 功能 |
-|--------|------|
-| `GetPointCord.py` | 提取单个 JSON 文件中的 target_point 坐标并生成 TXT 文件 |
-| `Batch_Getpointcord.py` | 批量提取目录下所有 JSON 文件的 target_point 坐标 |
-| `Getlist.py` | 组织数据集目录结构，将图片和 TXT 文件移动到单独文件夹并生成 train/test 列表文件 |
+3. **GetList.py（或 BuildP2PNetDataset.py）**
 
----
+   * 根据原始图像与批量生成的 `.txt`
+   * 自动构建完整的 P2PNet 数据集结构
+   * 自动划分 train/test
+   * 自动生成 train.list / test.list
 
-## 🔧 依赖要求
-
-- Python 3.x
-- 内置库：`os`, `sys`, `json`, `shutil`, `pathlib`
-- **无需安装额外第三方库**
+✔ 完整解决了从 JSON 标注 → P2PNet 数据格式的全部流程
+✔ 避免手动整理文件，极大提高数据准备效率
 
 ---
 
-## 🚀 使用流程
+# 📁 仓库结构
 
-### 第一步：提取坐标（针对原始 JSON 文件）
+```
+GetPointCord/
+│── GetPointCord.py           # 单个 JSON → txt
+│── Batch_GetPointCord.py     # 批量 JSON → txt
+│── GetList.py                # 构建 P2PNet 数据集
+│── README.md
+│── example/（可选示例）
+```
+
+---
+
+# 📌 1. GetPointCord.py
+
+### 作用
+
+从单个 JSON 文件中提取带有 `"shape_type": "point"` 的坐标，输出到 `.txt`。
+
+### 用法
 
 ```bash
-python Batch_Getpointcord.py ./annotations/
+# 提取所有 point
+python GetPointCord.py /path/to/annotation.json
+
+# 只提取指定标签
+python GetPointCord.py /path/to/annotation.json hzbokchoy broadleaf_weed
+
+# 显式声明提取所有 point
+python GetPointCord.py /path/to/annotation.json all
 ```
 
-会生成每个 JSON 文件对应的 TXT 坐标文件。
-
-### 第二步：组织数据集并生成列表文件
-
-```bash
-python Getlist.py ./dataset
-```
-
-自动移动文件、创建文件夹并生成 `train.list` 和 `test.list`。
-
----
-
-## 📖 详细使用方法
-
-### 1. GetPointCord.py
-
-**功能：**
-- 从单个 JSON 标注文件中提取 `target_point` 的坐标
-- 将坐标保存为与 JSON 文件同名的 `.txt` 文件
-
-**主要函数：**
-- `extract_target_points(json_path)`：返回 JSON 文件中所有 `target_point` 坐标列表
-- `save_to_txt(coordinates, output_path)`：将坐标列表保存到 TXT 文件
-
-**命令行用法：**
-
-```bash
-python GetPointCord.py <json文件路径>
-```
-
-**示例：**
-
-```bash
-python GetPointCord.py ./annotations/img01.json
-```
-
-**输出：**
-- 在 JSON 文件同目录生成 `img01.txt`，内容为坐标列表
-
----
-
-### 2. Batch_Getpointcord.py
-
-**功能：**
-- 批量处理指定目录下所有 JSON 文件
-- 调用 `GetPointCord.py` 的函数提取坐标并保存为 TXT 文件
-
-**使用方法：**
-
-```bash
-python Batch_Getpointcord.py <JSON文件目录>
-```
-
-**示例：**
-
-```bash
-python Batch_Getpointcord.py ./annotations/
-```
-
-**功能特点：**
-- 自动扫描目录下所有 `.json` 文件
-- 对每个文件：
-  - 提取 `target_point` 坐标
-  - 保存为 TXT 文件
-  - 跳过没有 `target_point` 的文件
-- 显示处理统计信息（成功、跳过、错误）
-
----
-
-### 3. Getlist.py
-
-**功能：**
-- 组织数据集文件结构，将同名图片和 TXT 文件移动到以文件名命名的文件夹中
-- 自动生成 `train.list` 和 `test.list` 文件，用于训练或测试
-
-**使用方法：**
-
-```bash
-python Getlist.py <数据集根目录>
-```
-
-**示例：**
-
-```bash
-python Getlist.py ./dataset
-```
-
-**目录要求：**
+### 输出示例（txt）
 
 ```
-dataset/
-├── train/
-│   ├── img01.jpg
-│   ├── img01.txt
-│   ├── img02.jpg
-│   └── img02.txt
-└── test/
-    ├── img03.jpg
-    └── img03.txt
-```
-
-**执行后目录结构：**
-
-```
-dataset/
-├── train/
-│   ├── img01/
-│   │   ├── img01.jpg
-│   │   └── img01.txt
-│   └── img02/
-│       ├── img02.jpg
-│       └── img02.txt
-├── test/
-│   └── img03/
-│       ├── img03.jpg
-│       └── img03.txt
-├── train.list
-└── test.list
-```
-
-**列表文件格式：**
-
-`train.list` 内容：
-```
-train/img01/img01.jpg train/img01/img01.txt
-train/img02/img02.jpg train/img02/img02.txt
-```
-
-`test.list` 内容：
-```
-test/img03/img03.jpg test/img03/img03.txt
+120 300
+248 410
+...
 ```
 
 ---
 
-## 📂 示例数据集结构
+# 📌 2. Batch_GetPointCord.py
 
-### 原始目录：
+### 作用
 
-```
-annotations/
-├── img01.json
-├── img02.json
-└── img03.json
-```
+批量处理一整个文件夹的 JSON，生成对应 `.txt` 文件。
 
-### 经过 Batch_Getpointcord.py 提取坐标后：
+### 用法
 
-```
-annotations/
-├── img01.json
-├── img01.txt
-├── img02.json
-├── img02.txt
-├── img03.json
-└── img03.txt
-```
-
-### 经过 Getlist.py 组织数据集后：
-
-```
-dataset/
-├── train/
-│   ├── img01/
-│   │   ├── img01.jpg
-│   │   └── img01.txt
-│   └── img02/
-│       ├── img02.jpg
-│       └── img02.txt
-├── test/
-│   └── img03/
-│       ├── img03.jpg
-│       └── img03.txt
-├── train.list
-└── test.list
-```
-
----
-
-## ⚠️ 注意事项
-
-1. **文件位置：** 请确保 `GetPointCord.py` 与 `Batch_Getpointcord.py` 在同一目录下，否则批量提取功能无法调用
-
-2. **标注格式：** `Batch_Getpointcord.py` 仅处理 JSON 文件中 `label` 为 `target_point` 的标注
-
-3. **支持的图片格式：** `Getlist.py` 支持的图片格式包括：`.jpg`, `.jpeg`, `.png`, `.bmp`, `.tiff`, `.tif`
-
-4. **路径格式：** 所有列表文件路径均为相对路径，使用正斜杠 `/`，适用于跨平台训练
-
-5. **数据备份：** 建议在运行脚本前备份原始数据，避免误操作导致数据丢失
-
----
-
-## 📝 快速命令参考
+#### （1）提取所有 point 类型
 
 ```bash
-# 批量提取坐标
-python Batch_Getpointcord.py ./annotations/
+python Batch_GetPointCord.py ./json_dir ./output_txt
+```
 
-# 组织数据集
-python Getlist.py ./dataset
+#### （2）只提取指定标签
 
-# 单文件提取（可选）
-python GetPointCord.py ./annotations/img01.json
+```bash
+python Batch_GetPointCord.py ./json_dir ./output_txt hzbokchoy broadleaf_weed
+```
+
+#### （3）等价于提取全部
+
+```bash
+python Batch_GetPointCord.py ./json_dir ./output_txt all
+```
+
+### 输出结构
+
+```
+output_txt/
+    img001.txt
+    img002.txt
+    ...
 ```
 
 ---
-### V1.0
-在 x-anylabeling 里，用 点标注 标出目标，label 名字必须是：target_point
 
-导出 每张图一个 JSON 的标注文件（x-anylabeling 默认的那种）。
+# 📌 3. GetList.py（BuildP2PNetDataset.py）
 
-用 Batch_GetPointCord.py 批量把 JSON 里的 target_point 提取成 xxx.txt 点坐标文件。
+### 作用
 
-把图片和对应 txt 放到 dataset_root/train、dataset_root/test 下。
+根据图片与 txt 文件自动生成标准 **P2PNet** 数据集结构。
 
-用 Getlist.py 按 P2PNet 要求的结构重组文件夹，并生成 train.list / test.list。
+包括：
 
-在 P2PNet 里把 --data_root 指到 dataset_root，就能直接训练。
+✔ train/test 自动划分
+✔ train/xxx/xxx.jpg & xxx.txt
+✔ test/xxx/xxx.jpg & xxx.txt
+✔ train.list
+✔ test.list
 
-### V1.1
+---
+
+## 使用方法
+
+```bash
+python GetList.py <images_dir> <txt_dir> <output_dataset_root> <train_ratio>
+```
+
+示例：
+
+```bash
+python GetList.py ./images ./points_txt ./P2PNet_dataset 0.8
+```
+
+---
+
+# 输出示例（最终数据集结构）
+
+```
+P2PNet_dataset/
+│── train/
+│     ├── img_0001/
+│     │      ├── img_0001.jpg
+│     │      └── img_0001.txt
+│     ├── img_0002/
+│     └── ...
+│
+│── test/
+│     ├── img_0101/
+│     │      ├── img_0101.jpg
+│     │      └── img_0101.txt
+│
+│── train.list
+│── test.list
+```
+
+### train.list 示例
+
+```
+train/img_0001/img_0001.jpg train/img_0001/img_0001.txt
+train/img_0002/img_0002.jpg train/img_0002/img_0002.txt
+...
+```
+
+---
+
+# 📝 P2PNet 所需的 txt 格式说明
+
+每行一个点，**像素坐标从 0 开始**：
+
+```
+x1 y1
+x2 y2
+x3 y3
+...
+```
+
+注意：
+
+✔ 这是 **密集点标注（crowd counting）** 格式
+✔ 与 YOLO、COCO 等 bbox 格式不同
+✔ JSON 中的坐标会自动转为 int
+
+---
+
+# ⚠ 注意事项
+
+### 1. JSON 格式需为 LabelMe 风格
+
+必须包含如下字段：
+
+```json
+{
+  "shapes": [
+    {
+      "label": "hzbokchoy",
+      "shape_type": "point",
+      "points": [[120.3, 450.8]]
+    }
+  ]
+}
+```
+
+### 2. 图片名与 txt 名必须一致
+
+如：
+
+```
+img001.jpg ↔ img001.json ↔ img001.txt
+```
+
+### 3. 点标注必须是 point 类型
+
+polygon、rectangle、circle 均不会被提取。
+
+### 4. GetList.py 不会递归处理子目录
+
+建议你将 **所有图片放在同一目录一级目录**。
+
+---
+
+# 完整流程
+
+### 第一步：批量抽取 JSON → txt
+
+```bash
+python Batch_GetPointCord.py ./json ./points_txt
+```
+
+### 第二步：生成 P2PNet 数据集
+
+```bash
+python GetList.py ./images ./points_txt ./P2PNet_dataset 0.8
+```
+
+然后即可直接用于 P2PNet 训练：
+
+```
+--data_root ./P2PNet_dataset
+--dataset_file P2P   # 自定义
+--train_list train.list
+--test_list  test.list
+```
+
+---
+
+# 适用场景
+
+* 🌱 杂草密集点标注（weed counting）
+* 👨‍👩‍👧‍👦 人群计数（crowd counting）
+* 🍇 果园密集果实点标注
+* 🍃 任何需要 point-based counting 的数据集
+
+---
+
+# ❤️ 贡献与联系
+
+欢迎提交 Issues 或 Pull Requests 来共同完善本工具！
+如果在使用过程中遇到任何问题、或有改进建议，也非常欢迎联系我。
+
+📧 Email：wangshichen0815@outlook.com
+
+🐙 GitHub Issues：在仓库页面提交即可
+
+感谢你对项目的关注与支持！
+
+---
 
