@@ -262,6 +262,8 @@ python GetList.py ./images ./points_txt ./P2PNet_dataset 0.8
 欢迎提交 Issues 或 Pull Requests 来共同完善本工具！
 如果在使用过程中遇到任何问题、或有改进建议，也非常欢迎联系我。
 
+特别感谢 @TONYHUaNGggggg 在项目开发中的协作与支持！
+
 📧 Email：wangshichen0815@outlook.com
 
 🐙 GitHub Issues：在仓库页面提交即可
