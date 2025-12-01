@@ -1,30 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-根据原始图像路径和批量 txt 路径，自动构建 P2PNet 数据集，并按比例划分 train / test。
+根据原始图像路径和批量 txt 路径，自动构建 P2PNet 数据集，并按比例划分 train / val / test。
 
 命令行用法：
-    python BuildP2PNetDataset.py <images_dir> <txt_dir> <output_dataset_root> <train_ratio>
+    python GetList.py <images_dir> <txt_dir> <output_dataset_root> <train_ratio> <val_ratio> <test_ratio>
 
 参数说明：
     images_dir           : 原始图像所在目录（只包含图片文件，当前版本不递归子目录）
     txt_dir              : 上一个 batch 脚本生成的 txt 文件所在目录（文件名需和图片同名）
     output_dataset_root  : 输出的数据集根目录
-    train_ratio          : 训练集比例（0~1 的小数，例如 0.8 表示 80% 训练，20% 测试）
+    train_ratio          : 训练集比例（0~1 的小数）
+    val_ratio            : 验证集比例（0~1 的小数）
+    test_ratio           : 测试集比例（0~1 的小数）
+
+要求：
+    train_ratio + val_ratio + test_ratio ≈ 1.0（允许轻微误差，比如 0.7 0.15 0.15）
 
 输出结构示例：
     output_dataset_root/
       ├── train/
-      │   ├── img001/
-      │   │   ├── img001.jpg
-      │   │   └── img001.txt
-      │   └── ...
+      ├── val/
       ├── test/
-      │   ├── img101/
-      │   │   ├── img101.jpg
-      │   │   └── img101.txt
-      │   └── ...
       ├── train.list
+      ├── val.list
       └── test.list
 """
 
@@ -99,15 +98,22 @@ def collect_pairs(images_dir: Path, txt_dir: Path):
     return pairs
 
 
-def split_train_test(pairs, train_ratio: float, seed: int = 42):
+def split_train_val_test(pairs, train_ratio: float, val_ratio: float, test_ratio: float, seed: int = 42):
     """
-    将 pairs 按 train_ratio 随机划分为 train / test。
+    将 pairs 按 train/val/test 比例随机划分。
 
     返回：
-        train_pairs, test_pairs
+        train_pairs, val_pairs, test_pairs
     """
-    if not (0.0 < train_ratio < 1.0):
-        print(f"错误: 训练集比例 train_ratio 必须在 (0, 1) 之间，而不是 {train_ratio}")
+    # 基本合法性检查
+    for name, r in zip(["train_ratio", "val_ratio", "test_ratio"], [train_ratio, val_ratio, test_ratio]):
+        if not (0.0 < r < 1.0):
+            print(f"错误: {name} 必须在 (0, 1) 之间，而不是 {r}")
+            sys.exit(1)
+
+    ratio_sum = train_ratio + val_ratio + test_ratio
+    if abs(ratio_sum - 1.0) > 1e-3:
+        print(f"错误: train_ratio + val_ratio + test_ratio 之和必须约等于 1.0，当前为 {ratio_sum:.4f}")
         sys.exit(1)
 
     random.seed(seed)
@@ -115,26 +121,58 @@ def split_train_test(pairs, train_ratio: float, seed: int = 42):
     random.shuffle(pairs_shuffled)
 
     total = len(pairs_shuffled)
-    train_count = int(total * train_ratio)
-    # 保障至少每个集合都有样本（如果 total 很小）
-    train_count = max(1, min(train_count, total - 1))
 
+    # 初步按比例计算数量
+    train_count = int(total * train_ratio)
+    val_count = int(total * val_ratio)
+
+    # 先保证至少为 1
+    train_count = max(1, train_count)
+    val_count = max(1, val_count)
+
+    # 预留给 test 的数量
+    remaining = total - train_count - val_count
+    if remaining <= 0:
+        # 如果 test 分不到样本，就从 train/val 中“借”一点
+        remaining = 1
+        # 简单调整：尽量保持 train 比较大
+        if train_count > 1:
+            train_count -= 1
+        elif val_count > 1:
+            val_count -= 1
+        else:
+            # 极端情况：总样本过少，直接报错更合理
+            print("错误: 样本总数太少，无法同时划分出 train/val/test 三个非空子集。")
+            sys.exit(1)
+
+    test_count = remaining
+
+    # 做一下边界保护，防止越界
+    if train_count + val_count + test_count != total:
+        # 强制修正最后一个集合的数量
+        test_count = total - train_count - val_count
+
+    # 真正切分
     train_pairs = pairs_shuffled[:train_count]
-    test_pairs = pairs_shuffled[train_count:]
+    val_pairs = pairs_shuffled[train_count:train_count + val_count]
+    test_pairs = pairs_shuffled[train_count + val_count:]
 
     print("\n数据划分：")
     print(f"  总样本数 : {total}")
     print(f"  训练集数 : {len(train_pairs)}")
+    print(f"  验证集数 : {len(val_pairs)}")
     print(f"  测试集数 : {len(test_pairs)}")
     print(f"  实际训练比例: {len(train_pairs) / total:.3f}")
+    print(f"  实际验证比例: {len(val_pairs) / total:.3f}")
     print(f"  实际测试比例: {len(test_pairs) / total:.3f}")
 
-    return train_pairs, test_pairs
+    return train_pairs, val_pairs, test_pairs
 
 
 def build_subset(pairs, out_root: Path, subset_name: str):
     """
-    根据给定的 (img_path, txt_path) 对，构建一个子集（train 或 test）结构，并返回 list 用的相对路径对。
+    根据给定的 (img_path, txt_path) 对，构建一个子集（train/val/test）结构，
+    并返回 list 用的相对路径对。
 
     输出结构：
         out_root/subset_name/stem/stem.jpg
@@ -185,25 +223,22 @@ def build_subset(pairs, out_root: Path, subset_name: str):
 
 def print_usage(prog_name: str):
     print(f"使用方法:")
-    print(f"  python {prog_name} <images_dir> <txt_dir> <output_dataset_root> <train_ratio>\n")
+    print(f"  python {prog_name} <images_dir> <txt_dir> <output_dataset_root> <train_ratio> <val_ratio> <test_ratio>\n")
     print("参数说明：")
     print("  images_dir          : 原始图像目录（只包含图像文件）")
     print("  txt_dir             : 批量生成的 txt 目录（文件名需与图片同名，如 img001.jpg ↔ img001.txt）")
     print("  output_dataset_root : 输出的数据集根目录")
-    print("  train_ratio         : 训练集比例（0~1 的小数，例如 0.8 表示 8:2 划分）\n")
+    print("  train_ratio         : 训练集比例（0~1 的小数）")
+    print("  val_ratio           : 验证集比例（0~1 的小数）")
+    print("  test_ratio          : 测试集比例（0~1 的小数）")
+    print("\n要求：train_ratio + val_ratio + test_ratio ≈ 1.0\n")
     print("输出结构示例：")
     print("  output_dataset_root/")
     print("    ├── train/")
-    print("    │   ├── img001/")
-    print("    │   │   ├── img001.jpg")
-    print("    │   │   └── img001.txt")
-    print("    │   └── ...")
+    print("    ├── val/")
     print("    ├── test/")
-    print("    │   ├── img101/")
-    print("    │   │   ├── img101.jpg")
-    print("    │   │   └── img101.txt")
-    print("    │   └── ...")
     print("    ├── train.list")
+    print("    ├── val.list")
     print("    └── test.list")
 
 
@@ -211,7 +246,7 @@ def main():
     argv = sys.argv
     prog = Path(argv[0]).name
 
-    if len(argv) != 5:
+    if len(argv) != 7:
         print_usage(prog)
         sys.exit(1)
 
@@ -221,8 +256,10 @@ def main():
 
     try:
         train_ratio = float(argv[4])
+        val_ratio = float(argv[5])
+        test_ratio = float(argv[6])
     except ValueError:
-        print(f"错误: train_ratio 必须是一个 0~1 的小数，例如 0.8，而不是 '{argv[4]}'")
+        print(f"错误: train_ratio, val_ratio, test_ratio 必须是 0~1 的小数，例如 0.7 0.15 0.15")
         sys.exit(1)
 
     out_root.mkdir(parents=True, exist_ok=True)
@@ -231,17 +268,26 @@ def main():
     # 1. 收集所有有效 (image, txt) 对
     pairs = collect_pairs(images_dir, txt_dir)
 
-    # 2. 按比例划分 train / test
-    train_pairs, test_pairs = split_train_test(pairs, train_ratio=train_ratio, seed=42)
+    # 2. 按比例划分 train / val / test
+    train_pairs, val_pairs, test_pairs = split_train_val_test(
+        pairs,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        test_ratio=test_ratio,
+        seed=42
+    )
 
     # 3. 构建 train 子集
     build_subset(train_pairs, out_root, subset_name="train")
 
-    # 4. 构建 test 子集
+    # 4. 构建 val 子集
+    build_subset(val_pairs, out_root, subset_name="val")
+
+    # 5. 构建 test 子集
     build_subset(test_pairs, out_root, subset_name="test")
 
     print("\n" + "=" * 60)
-    print("全部完成！数据集已构建完成，可用于 P2PNet 训练。")
+    print("全部完成！数据集已构建完成，可用于 P2PNet 训练 / 验证 / 测试。")
 
 
 if __name__ == "__main__":

@@ -234,7 +234,7 @@ python Batch_GetPointCord.py ./json ./points_txt
 ### 第二步：生成 P2PNet 数据集
 
 ```bash
-python GetList.py ./images ./points_txt ./P2PNet_dataset 0.8
+python GetList.py ./images ./points_txt ./P2PNet_dataset 0.7 0.15 0.15
 ```
 
 然后即可直接用于 P2PNet 训练：
